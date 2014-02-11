@@ -1,0 +1,81 @@
+/*
+ *Author: Allen Suner
+ *CSCI 322 Assignment 3
+ *Solution #2
+ *Febuary 3rd, 2014
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <mpi.h>
+#include <stdlib.h>
+
+#define INT_MAX 0x7FFFFFFF
+#define INT_MIN 0x80000000
+
+int main (int argc, char **argv) {
+
+	/*SETUP*/
+	double t1, t2, elapsed, global_time;
+	int comm_sz, my_rank, next, prev, last;
+	int min = INT_MAX;
+	int max = INT_MIN;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+	unsigned int seed = my_rank;
+	int message = rand_r(&seed)%100;
+	unsigned int size = 1;
+	next = (my_rank + 1)%comm_sz;
+	prev = (my_rank - 1);
+	last = comm_sz - 1;
+	int curr;
+	usleep(rand_r(&seed)%1000);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	t1 = MPI_Wtime();
+	
+	/*MESSAGE PASSING*/
+	if (my_rank == 0) {
+		//send min and max
+		MPI_Send(&message, size, MPI_INT, next, 0, MPI_COMM_WORLD);
+		MPI_Send(&message, size, MPI_INT, next, 0, MPI_COMM_WORLD);
+		//receive for both min and max	
+ 	  MPI_Recv(&curr, size, MPI_INT, last, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		min = curr;
+		MPI_Recv(&curr, size, MPI_INT, last, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		max = curr;
+  }
+  if (my_rank != 0) {
+
+		curr = message;		
+
+		//recv min and max from previous
+    MPI_Recv(&min, size, MPI_INT, prev, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+		MPI_Recv(&max, size, MPI_INT, prev, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+		if (curr > max) {
+			max = curr;
+		}
+		if (curr < min) {
+			min = curr;
+		}
+		//send to next
+		MPI_Send(&min, size, MPI_INT, next, 0, MPI_COMM_WORLD);
+		MPI_Send(&max, size, MPI_INT, next, 0, MPI_COMM_WORLD);
+  }
+
+	
+  
+
+	t2 = MPI_Wtime();
+	elapsed = t2 - t1;
+	MPI_Reduce(&elapsed, &global_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+	printf("I am process %d, and I took %f seconds to execute.\n", my_rank, global_time);
+
+	/*TEARDOWN*/
+	MPI_Finalize();
+	return 0;
+}
