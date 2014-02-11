@@ -1,0 +1,64 @@
+/*
+ *Author: Allen Suner
+ *CSCI 322 Assignment 3
+ *Solution #2
+ *Febuary 3rd, 2014
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <mpi.h>
+#include <stdlib.h>
+
+#define INT_MAX 0x7FFFFFFF
+#define INT_MIN 0x80000000
+
+int main (int argc, char **argv) {
+	/*SETUP*/
+	double t1, t2, elapsed, global_time;
+	int comm_sz, my_rank;
+	int min = INT_MAX;
+	int max = INT_MIN;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+	unsigned int seed = my_rank;
+	int message = rand_r(&seed)%100;
+	unsigned int size = 1;
+	usleep(rand_r(&seed)%1000);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	t1 = MPI_Wtime();
+
+	/*MESSAGE PASSING*/
+	int curr, i;
+	for (i = 0; i < comm_sz; i++) {
+		//my_process sends its value to process i if it is not itself.
+		if (my_rank != i) {
+			MPI_Send(&message, size, MPI_INT, i, 0, MPI_COMM_WORLD);
+		}
+	}
+
+	for (i = 0; i < comm_sz; i++) {
+		//my_process receives value from process i if it is not itself.
+		if (my_rank != i) {
+			MPI_Recv(&curr, size, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			if (curr > max) {
+				max = curr;
+			}
+			if (curr < min) {
+				min = curr;
+			}
+		}
+	}
+	
+	t2 = MPI_Wtime();
+	elapsed = t2 - t1;
+	MPI_Reduce(&elapsed, &global_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+	printf("I am process %d, and I took %f seconds to execute.\n", global_time);
+
+	/*TEARDOWN*/
+	MPI_Finalize();
+	return 0;
+}
